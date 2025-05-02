@@ -1,20 +1,20 @@
 version: "3.9"
 
 configs:
-  prometheus_config: # ← this bundles prometheus.yml
-    file: ./prometheus.yml #   (must be in the same repo)
+  prometheus_config: # ships the full Prometheus config into the container
+    file: ./prometheus.yml # keep this file in the same repo, next to this compose file
 
 services:
   prometheus:
     image: prom/prometheus:v2.52.0
     restart: unless-stopped
-    configs: # ← inject config into container
+    configs:
       - source: prometheus_config
-        target: /etc/prometheus/prometheus.yml
+        target: /etc/prometheus/prometheus.yml # inside‑container path
     volumes:
-      - prom_data:/prometheus # data dir persists
+      - prom_data:/prometheus # persistent TSDB
     ports:
-      - "9090:9090" # internal or public, as you prefer
+      - "9090:9090" # reach Prometheus (internal or public)
 
 volumes:
   prom_data:
