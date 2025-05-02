@@ -1,20 +1,39 @@
 version: "3.9"
 
-configs:
-  prometheus_config: # ships the full Prometheus config into the container
-    file: ./prometheus.yml # keep this file in the same repo, next to this compose file
-
 services:
   prometheus:
     image: prom/prometheus:v2.52.0
     restart: unless-stopped
+
+    # Inject the Prometheus config directly (no host file)
     configs:
-      - source: prometheus_config
-        target: /etc/prometheus/prometheus.yml # inside‑container path
+      - source: prometheus_inline_cfg
+        target: /etc/prometheus/prometheus.yml
+
     volumes:
       - prom_data:/prometheus # persistent TSDB
     ports:
-      - "9090:9090" # reach Prometheus (internal or public)
+      - "9090:9090" # internal or public
+
+configs:
+  prometheus_inline_cfg:
+    # Coolify / Docker will create this file inside the container
+    # The "|" introduces a block literal, so keep the indentation as‑is.
+    content: |
+      global:
+        scrape_interval: 15s
+        scrape_timeout: 10s
+        evaluation_interval: 15s
+
+      scrape_configs:
+        - job_name: "laravel_apps"
+          scheme: https                     # use HTTPS
+          metrics_path: /prometheus         # endpoint exposed by spatie/laravel-prometheus
+          static_configs:
+            - targets:
+                - saasbrainstorm.com        # host only; port 443 is implied
+          tls_config:
+            insecure_skip_verify: true      # drop this line when you have a valid cert
 
 volumes:
   prom_data:
