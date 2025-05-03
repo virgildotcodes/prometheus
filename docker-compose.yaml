@@ -1,32 +1,61 @@
 version: "3.9"
 
 services:
+  # ───────────────────────── Prometheus ─────────────────────────
   prometheus:
-    image: prom/prometheus:v2.52.0
-    user: root # ← add this line
+    image: prom/prometheus:v2.52.0 # latest stable
+    user: root # read mounted config without chmod hacks
     restart: unless-stopped
+
+    # Inject the full config as an inline "config" object
     configs:
       - source: prometheus_inline_cfg
         target: /etc/prometheus/prometheus.yml
-    volumes:
-      - prom_data:/prometheus
-    ports:
-      - "9090:9090"
 
+    volumes:
+      - prom_data:/prometheus # TSDB persistence
+    ports:
+      - "9090:9090" # coolify → Traefik uses this
+
+  # ──────────────────────── Node Exporter (optional) ────────────
+  node_exporter:
+    image: prom/node-exporter:v1.8.1
+    network_mode: host # expose on localhost:9100
+    pid: host
+    restart: unless-stopped
+    command:
+      - "--path.rootfs=/host"
+    volumes:
+      - /:/host:ro,rslave
+
+# ───────────────────────── Embedded Prometheus config ────────────
 configs:
   prometheus_inline_cfg:
-    # no “mode:” line – Compose v3 would reject it
     content: |
       global:
         scrape_interval: 15s
+        scrape_timeout: 10s
+        evaluation_interval: 15s
+
       scrape_configs:
+        # Self‑scrape so dashboards light up
+        - job_name: "prometheus"
+          static_configs:
+            - targets: ["localhost:9090"]
+
+        # Laravel apps over HTTPS
         - job_name: "laravel_apps"
           scheme: https
-          metrics_path: /prometheus
+          metrics_path: /prometheus      # change to /metrics if needed
           static_configs:
-            - targets: [ "saasbrainstorm.com" ]
+            - targets: ["saasbrainstorm.com"]
           tls_config:
-            insecure_skip_verify: true
+            insecure_skip_verify: true   # drop when you have a valid cert
+
+        # Node Exporter (server CPU/RAM/Disk)
+        - job_name: "node"
+          static_configs:
+            - targets: ["localhost:9100"]
 
 volumes:
   prom_data:
