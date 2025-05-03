@@ -3,10 +3,11 @@ version: "3.9"
 services:
   prometheus:
     image: prom/prometheus:v2.52.0
+    user: root # ← add this line
     restart: unless-stopped
     configs:
       - source: prometheus_inline_cfg
-        target: /etc/prometheus/prometheus.yml # no need for extra options
+        target: /etc/prometheus/prometheus.yml
     volumes:
       - prom_data:/prometheus
     ports:
@@ -14,7 +15,7 @@ services:
 
 configs:
   prometheus_inline_cfg:
-    mode: "0444" # 👈 make it readable by the nobody user
+    # no “mode:” line – Compose v3 would reject it
     content: |
       global:
         scrape_interval: 15s
@@ -26,5 +27,6 @@ configs:
             - targets: [ "saasbrainstorm.com" ]
           tls_config:
             insecure_skip_verify: true
+
 volumes:
   prom_data:
